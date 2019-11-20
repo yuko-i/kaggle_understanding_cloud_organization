@@ -6,6 +6,7 @@ import segmentation_models_pytorch as smp
 import sys
 sys.path.append('../')
 from datasets.CloudDataset import CloudDataset
+from datasets.CloudDataset_Multi import CloudDataset_Multi
 
 from loss.MixLoss import MixLoss
 import torch
@@ -16,8 +17,8 @@ from catalyst.dl.callbacks import DiceCallback, EarlyStoppingCallback
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from catalyst.dl.runner import SupervisedRunner
 from cloud_util import get_preprocessing, get_validation_augmentation, get_training_augmentation
-from model.Linknet_ADD import Linknet_resnet18
-from model.ASPP_3 import Linknet_resnet18_ASPP
+from model.Linknet_Classifer import Linknet_resnet18_Classifer, Multi_Loss
+from model.ASPP import Linknet_resnet18_ASPP
 
 
 def main():
@@ -51,47 +52,23 @@ def main():
     valid_ids = np.array(val_fold.file_name)
 
     encoder_weights = 'imagenet'
-    attention_type = None if attention_type == 'None' else attention_type
 
-    if model_name == 'Unet':
-        model = smp.Unet(
-            encoder_name=encoder,
-            encoder_weights=encoder_weights,
-            classes=4,
-            activation='softmax',
-            attention_type=attention_type,
-        )
-    if model_name == 'Linknet':
-        model = smp.Linknet(
-            encoder_name=encoder,
-            encoder_weights=encoder_weights,
-            classes=4,
-            activation='softmax',
-        )
-    if model_name == 'FPN':
-        model = smp.FPN(
-            encoder_name=encoder,
-            encoder_weights=encoder_weights,
-            classes=4,
-            activation='softmax',
-        )
-    if  model_name ==  'ORG':
-        model = Linknet_resnet18_ASPP()
+    if  model_name ==  'ORG_Link18':
+        model = Linknet_resnet18_Classifer()
 
 
     preprocessing_fn = smp.encoders.get_preprocessing_fn(encoder, encoder_weights)
 
-    train_dataset = CloudDataset(df=train, datatype='train', img_ids=train_ids,
+    train_dataset = CloudDataset_Multi(df=train, datatype='train', img_ids=train_ids,
                                  transforms=get_training_augmentation(),
                                  preprocessing=get_preprocessing(preprocessing_fn))
 
-    valid_dataset = CloudDataset(df=train, datatype='valid', img_ids=valid_ids,
+    valid_dataset = CloudDataset_Multi(df=train, datatype='valid', img_ids=valid_ids,
                                  transforms=get_validation_augmentation(),
                                  preprocessing=get_preprocessing(preprocessing_fn))
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
-                              drop_last=True, pin_memory=True,)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
 
     loaders = {
         "train": train_loader,
@@ -102,7 +79,7 @@ def main():
 
     print(logdir)
 
-    if model_name ==  'ORG':
+    if model_name ==  'ORG_Link18':
         optimizer = Nadam([
             {'params': model.parameters(), 'lr': learn_late},
         ])
@@ -114,7 +91,7 @@ def main():
 
 
     scheduler = ReduceLROnPlateau(optimizer, factor=0.5, patience=0)
-    criterion = smp.utils.losses.BCEDiceLoss()
+    criterion = Multi_Loss()
 
     runner = SupervisedRunner()
 
@@ -124,7 +101,7 @@ def main():
         optimizer=optimizer,
         scheduler=scheduler,
         loaders=loaders,
-        callbacks=[DiceCallback(), EarlyStoppingCallback(patience=5, min_delta=1e-7)],
+        callbacks=[EarlyStoppingCallback(patience=5, min_delta=1e-7)],
         logdir=logdir,
         num_epochs=num_epochs,
         verbose=1

@@ -5,7 +5,6 @@ import pandas as pd
 
 def rle_decode(mask_rle: str = '', shape: tuple = (350, 525)):
     """
-    rleをmask imageに変換
     :param mask_rle:
     :param shape:
     :return:
@@ -26,7 +25,6 @@ def rle_decode(mask_rle: str = '', shape: tuple = (350, 525)):
 
 def make_mask(df: pd.DataFrame, image_name: str = 'img.jpg', shape: tuple = (350, 525)):
     """
-    対象の画像のmask imageを作成
     :param df:
     :param image_name:
     :param shape:

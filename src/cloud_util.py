@@ -20,11 +20,12 @@ def get_training_augmentation():
         # albu.ShiftScaleRotate(scale_limit=0.5, rotate_limit=0, shift_limit=0.1, p=0.5, border_mode=0),
         albu.ShiftScaleRotate(scale_limit=0.5, rotate_limit=0, shift_limit=0.1, p=0.5, border_mode=0),
         albu.OpticalDistortion(p=0.5, distort_limit=2, shift_limit=0.5),
-        #albu.GridDistortion(p=0.5,),
+        #albu.RandomGridShuffle(p=0.5, grid=(3,3)),
+        #albu.RandomCrop(p=0.5, height=250, width=325),# ADD
+        #albu.GridDistortion(p=0.5),# ADD
         # albu.RandomBrightnessContrast(p=0.5),
         #albu.ToGray(p=1.0),
-        #albu.CLAHE(p=1.0),
-        albu.Resize(320, 640)
+        albu.Resize(320, 480)#640)
     ]
     return albu.Compose(train_transform)
 
@@ -33,7 +34,33 @@ def get_validation_augmentation():
     test_transform = [
         #albu.ToGray(p=1.0),
         #albu.CLAHE(p=1.0),
-        albu.Resize(320, 640)
+
+        albu.Resize(320, 480)#640)
+    ]
+    return albu.Compose(test_transform)
+
+
+def get_training_augmentation_large():
+    train_transform = [
+        # albu.ShiftScaleRotate(scale_limit=0.5, rotate_limit=0, shift_limit=0.1, p=0.5, border_mode=0),
+        albu.ShiftScaleRotate(scale_limit=0.5, rotate_limit=0, shift_limit=0.1, p=0.5, border_mode=0),
+        albu.OpticalDistortion(p=0.5, distort_limit=2, shift_limit=0.5),
+        #albu.RandomGridShuffle(p=0.5, grid=(3,3)),
+        #albu.RandomCrop(p=0.5, height=250, width=325),# ADD
+        #albu.GridDistortion(p=0.5),# ADD
+        # albu.RandomBrightnessContrast(p=0.5),
+        #albu.ToGray(p=1.0),
+        albu.Resize(640, 960)#640)
+    ]
+    return albu.Compose(train_transform)
+
+
+def get_validation_augmentation_large():
+    test_transform = [
+        #albu.ToGray(p=1.0),
+        #albu.CLAHE(p=1.0),
+
+        albu.Resize(640, 960)#640)
     ]
     return albu.Compose(test_transform)
 
@@ -56,6 +83,9 @@ def post_process(probability, threshold, min_size):
     :return: predictions : mask image (shape==(350, 525)), num : is exist mask
     """
     mask = cv2.threshold(probability, threshold, 1, cv2.THRESH_BINARY)[1]  # 閾値で0,1に分ける。
+    if mask.shape != (350, 525):
+        mask = cv2.resize(mask, dsize=(350, 525))
+
     num_component, component = cv2.connectedComponents(mask.astype(np.uint8))  # 繋がっている部分をシーケンシャルにラベリングしていっている。
     predictions = np.zeros((350, 525), np.float32)
     num = 0
@@ -70,7 +100,6 @@ def post_process(probability, threshold, min_size):
 def dice(img1, img2):
     img1 = np.asarray(img1).astype(np.bool)
     img2 = np.asarray(img2).astype(np.bool)
-
     intersection = np.logical_and(img1, img2)
 
     return 2. * intersection.sum() / (img1.sum() + img2.sum())

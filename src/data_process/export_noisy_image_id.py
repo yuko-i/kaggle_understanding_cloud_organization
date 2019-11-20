@@ -13,18 +13,18 @@ PATH = '/home/yuko/kaggle_understanding_cloud_organization/src/val'
 
 def main():
 
-    val_0 = noisye_id(val_csv=f'{PATH}/val_unet_fold_0_resnet18.csv')
-    val_1 = noisye_id(val_csv=f'{PATH}/val_unet_fold_1_resnet18.csv')
-    val_2 = noisye_id(val_csv=f'{PATH}/val_unet_fold_2_se_resnet50.csv')
-    val_3 = noisye_id(val_csv=f'{PATH}/val_unet_fold_3_resnet34.csv')
-    val_4 = noisye_id(val_csv=f'{PATH}/val_unet_fold_4_se_resnet50.csv')
-    df_noisey = pd.concat([val_0, val_1, val_2, val_3, val_4])
-    df_noisey = df_noisey.rename(columns={'im_id_x':'im_id'})
-    df_noisey.to_csv('noisye_id.csv')
+    val_0 = noisy_id(val_csv=f'{PATH}/val_unet_fold_0_resnet18.csv')
+    val_1 = noisy_id(val_csv=f'{PATH}/val_unet_fold_1_resnet18.csv')
+    val_2 = noisy_id(val_csv=f'{PATH}/val_unet_fold_2_se_resnet50.csv')
+    val_3 = noisy_id(val_csv=f'{PATH}/val_unet_fold_3_resnet34.csv')
+    val_4 = noisy_id(val_csv=f'{PATH}/val_unet_fold_4_se_resnet50.csv')
+    df_noisy = pd.concat([val_0, val_1, val_2, val_3, val_4])
+    df_noisy = df_noisy.rename(columns={'im_id_x': 'im_id'})
+    df_noisy[['im_id']].to_csv('./data/noisy_id.csv')
 
 
-def noisye_id(val_csv, train_csv='../../src/data_process/data/train_flip_aug_resize.csv'):
-    print(f'start export {export_csv} ==================================')
+def noisy_id(val_csv, train_csv='../../src/data_process/data/train_flip_aug_resize.csv'):
+    print(f'start  ==================================')
     val = pd.read_csv(val_csv)
     train = pd.read_csv(train_csv)
 

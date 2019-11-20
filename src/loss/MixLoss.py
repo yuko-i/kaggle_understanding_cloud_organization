@@ -9,7 +9,7 @@ from itertools import filterfalse
 
 class MixLoss(nn.Module):
 
-    def __init__(self, bce_w=1.0, dice_w=0.0, focal_w=0.0, lovasz_w=0.0,
+    def __init__(self, bce_w=0.7, dice_w=0.0, focal_w=0.0, lovasz_w=0.3,
                  bce_kwargs={}, dice_kwargs={}, focal_kwargs={}, lovasz_kwargs={}):
         super(MixLoss, self).__init__()
         self.bce_w = bce_w

@@ -19,6 +19,9 @@ import ttach as tta
 import cv2
 import os
 import torch
+from subprocess import check_call
+import gc
+from model.ASPP_3 import Linknet_resnet18_ASPP
 
 sigmoid = lambda x: 1 / (1 + np.exp(-x))
 
@@ -38,7 +41,7 @@ def main():
     log_path = args.log_path
     is_tta = args.is_tta
     test_batch_size = args.test_batch_size
-
+    attention_type = args.attention_type
     print(log_path)
 
     train = pd.read_csv(train_csv)
@@ -48,16 +51,38 @@ def main():
     val_fold = pd.read_csv(f'{fold_path}/val_file_fold_{fold_num}.csv')
     valid_ids = np.array(val_fold.file_name)
 
+    attention_type = None if attention_type == 'None' else attention_type
+
+    encoder_weights = 'imagenet'
+
     if model_name == 'Unet':
-        encoder_weights = 'imagenet'
         model = smp.Unet(
             encoder_name=encoder,
             encoder_weights=encoder_weights,
             classes=CLASS,
             activation='softmax',
+            attention_type=attention_type,
+        )
+    if model_name == 'Linknet':
+        model = smp.Linknet(
+            encoder_name=encoder,
+            encoder_weights=encoder_weights,
+            classes=CLASS,
+            activation='softmax',
+        )
+    if model_name == 'FPN':
+        model = smp.FPN(
+            encoder_name=encoder,
+            encoder_weights=encoder_weights,
+            classes=CLASS,
+            activation='softmax',
+        )
+    if model_name == 'ORG':
+        model = Linknet_resnet18_ASPP(
         )
 
-        preprocessing_fn = smp.encoders.get_preprocessing_fn(encoder, encoder_weights)
+
+    preprocessing_fn = smp.encoders.get_preprocessing_fn(encoder, encoder_weights)
 
     valid_dataset = CloudDataset(df=train,
                                  datatype='valid',
@@ -66,39 +91,25 @@ def main():
                                  preprocessing=get_preprocessing(preprocessing_fn))
 
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-
     loaders = {"infer": valid_loader}
     runner = SupervisedRunner()
 
-    if is_tta:
-        print('TTA')
-        checkpoint = torch.load(f"{log_path}/checkpoints/best.pth")
-        model.load_state_dict(checkpoint['model_state_dict'])
-        model.eval()
-        transforms = tta.Compose(
-            [
-                tta.HorizontalFlip(),
-                tta.VerticalFlip(),
-            ]
-        )
-        model = tta.SegmentationTTAWrapper(model, transforms)
-        runner.infer(
-            model=model,
-            loaders=loaders,
-            callbacks=[InferCallback()],
-        )
-        callbacks_num = 0
-    else:
-        print('not TTA')
-        runner.infer(
-            model=model,
-            loaders=loaders,
-            callbacks=[
-                CheckpointCallback(resume=f"{log_path}/checkpoints/best.pth"),
-                InferCallback()
-            ],
-        )
-        callbacks_num = 1
+    checkpoint = torch.load(f"{log_path}/checkpoints/best.pth")
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.eval()
+    transforms = tta.Compose(
+        [
+            tta.HorizontalFlip(),
+            tta.VerticalFlip(),
+        ]
+    )
+    model = tta.SegmentationTTAWrapper(model, transforms)
+    runner.infer(
+        model=model,
+        loaders=loaders,
+        callbacks=[InferCallback()],
+    )
+    callbacks_num = 0
 
     valid_masks = []
     probabilities = np.zeros((valid_dataset.__len__() * CLASS, IMG_SIZE[0], IMG_SIZE[1]))
@@ -143,6 +154,12 @@ def main():
         class_params[class_id] = (best_threshold, best_size)
 
     # ========
+    # gc
+    #
+    torch.cuda.empty_cache()
+    gc.collect()
+
+    # ========
     # predict
     #
     sub = pd.read_csv(sub_csv)
@@ -163,6 +180,7 @@ def main():
     # ========
     # val dice
     #
+
     val_Image_Label = []
     for i, row in val_fold.iterrows():
         val_Image_Label.append(row.file_name + '_Fish')
@@ -174,19 +192,9 @@ def main():
     val = pd.DataFrame(val_encoded_pixels, columns=['EncodedPixels'])
     val['Image_Label'] = val_Image_Label
 
-    if is_tta:
-        sub.to_csv(f'./sub/sub_unet_fold_{fold_num}_{encoder}_tta.csv', columns=['Image_Label', 'EncodedPixels'],
-                   index=False)
-
-        val.to_csv(f'./val/val_unet_fold_{fold_num}_{encoder}_tta.csv', columns=['Image_Label', 'EncodedPixels'],
-                   index=False)
-
-    else:
-        sub.to_csv(f'./sub/sub_unet_fold_{fold_num}_{encoder}.csv', columns=['Image_Label', 'EncodedPixels'],
-                   index=False)
-
-        val.to_csv(f'./val/val_unet_fold_{fold_num}_{encoder}.csv', columns=['Image_Label', 'EncodedPixels'],
-                   index=False)
+    sub.to_csv(f'./sub/sub_{model_name}_fold_{fold_num}_{encoder}.csv', columns=['Image_Label', 'EncodedPixels'], index=False)
+    val.to_csv(f'./val/val_{model_name}_fold_{fold_num}_{encoder}.csv', columns=['Image_Label', 'EncodedPixels'], index=False)
+    #check_call(['/home/yuko/kaggle_understanding_cloud_organization/src/SD.sh'], shell=True)
 
 
 def resize_img(img):
@@ -257,8 +265,12 @@ if __name__ == '__main__':
     parser.add_argument('-bs', '--batch_size', type=int, default=16)
     parser.add_argument('-tt', '--is_tta', type=int, default=1)
     parser.add_argument('-tb', '--test_batch_size', type=int, default=4)
+    parser.add_argument('-at', '--attention_type', type=str, default='scse')
     args = parser.parse_args()
 
     print(f'{os.path.basename(__file__)}: start main function')
     main()
     print('success')
+
+    from subprocess import check_call
+    check_call(['/home/yuko/kaggle_understanding_cloud_organization/src/SD.sh'], shell=True)

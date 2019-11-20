@@ -9,7 +9,7 @@ import albumentations as albu
 import sys
 sys.path.append('../')
 
-
+import torch
 from config.config import TRAIN_IMG_PATH, TEST_IMG_PATH
 
 
@@ -23,6 +23,17 @@ def make_mask(df: pd.DataFrame, image_name: str = 'img.jpg', shape: tuple = (350
             masks[:, :, idx] = mask
     return masks
 
+def make_mask_label_label(df: pd.DataFrame, image_name: str = 'img.jpg', shape: tuple = (350, 525)):
+    encoded_masks = df.loc[df['im_id'] == image_name, 'EncodedPixels']
+    label_data = df.loc[df['im_id'] == image_name, 'Image_Label'].values[0]
+    masks = np.zeros((shape[0], shape[1], 4), dtype=np.float32)
+
+    for idx, label in enumerate(encoded_masks.values):
+        if label is not np.nan:
+            mask = rle_decode(label)
+            masks[:, :, idx] = mask
+    return masks, label_data
+
 
 def rle_decode(mask_rle: str = '', shape: tuple = (350, 525)):
     s = mask_rle.split()
@@ -35,7 +46,7 @@ def rle_decode(mask_rle: str = '', shape: tuple = (350, 525)):
     return img.reshape(shape, order='F')
 
 
-class CloudDataset(Dataset):
+class CloudDataset_Multi(Dataset):
     def __init__(self,
                  df: pd.DataFrame = None,
                  datatype: str = 'train',
@@ -44,7 +55,8 @@ class CloudDataset(Dataset):
                  preprocessing=None):
 
         self.df = df
-        if datatype != 'test':
+        self.datatype = datatype
+        if self.datatype != 'test':
             self.data_folder = f"{TRAIN_IMG_PATH}"
         else:
             self.data_folder = f"{TEST_IMG_PATH}"
@@ -54,7 +66,10 @@ class CloudDataset(Dataset):
 
     def __getitem__(self, idx):
         image_name = self.img_ids[idx]
-        mask = make_mask(self.df, image_name)
+       #mask, label = make_mask_label_label(self.df, image_name)
+
+        if self.datatype != 'test':
+            mask, label = make_mask_label_label(self.df, image_name)
 
         image_path = os.path.join(self.data_folder, image_name)
         img = cv2.imread(image_path)
@@ -68,7 +83,13 @@ class CloudDataset(Dataset):
             img = preprocessed['image']
             mask = preprocessed['mask']
 
-        return img, mask
+        label_ts = torch.zeros(4)
+        if self.datatype != 'test':
+            for cls in [i for i, x in enumerate(label) if x == 1]:
+                label_ts[int(cls)] = 1
+        print(label_ts.shape)
+        print(img.shape)
+        return img, mask, label_ts
 
     def __len__(self):
         return len(self.img_ids)

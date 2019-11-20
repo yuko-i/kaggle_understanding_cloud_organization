@@ -5,9 +5,9 @@ from torchvision.models import resnet
 from torchvision import models
 from torchvision.models.resnet import BasicBlock
 
-class Linknet_resnet18(nn.Module):
+class Linknet_resnet18_Classifer(nn.Module):
     def __init__(self, n_classes=4):
-        super(Linknet_resnet18, self).__init__()
+        super(Linknet_resnet18_Classifer, self).__init__()
 
         # Encoder
         self.resnet_18 = models.resnet18(pretrained=True)
@@ -23,7 +23,8 @@ class Linknet_resnet18(nn.Module):
         self.initialize()
 
     def forward(self, x):
-
+        print(x.shape)
+        batch_size, C, H, W = x.shape
         x0 = self.resnet_18.conv1(x)
         x0 = self.resnet_18.bn1(x0)
         x0 = self.resnet_18.relu(x0)
@@ -45,7 +46,10 @@ class Linknet_resnet18(nn.Module):
         xd_3 = self.layer4([xd_2, skips[3]])
         xd_4 = self.layer5([xd_3, None])
         probability_mask = self.final_conv(xd_4)
-        return probability_mask
+        probability_label = F.adaptive_max_pool2d(probability_mask, 1).view(batch_size, -1)
+        print(probability_label.shape)
+        print(probability_mask.shape)
+        return probability_mask, probability_label
 
     def predict(self, x):
         if self.training:
@@ -101,88 +105,6 @@ class DecoderBlock(nn.Module):
         return x
 
 
-"""""""""""""""""""""""""""
-    
-"""""""""""""""""""""""""""
-class DecoderBlock2(nn.Module):
-    def __init__(self, in_channels, out_channels, use_batchnorm=True, attention_type=None):
-        super().__init__()
-
-        self.attention1 = SCSEModule(in_channels)
-        self.attention2 = SCSEModule(out_channels)
-        self.block = nn.Sequential(
-            Conv2dReLU2(in_channels, out_channels, kernel_size=3, padding=1, use_batchnorm=use_batchnorm),
-            Conv2dReLU2(out_channels, out_channels, kernel_size=3, padding=1, use_batchnorm=use_batchnorm),
-        )
-
-    def forward(self, x):
-        x, skip = x
-        x = F.interpolate(x, scale_factor=2, mode='nearest')
-        if skip is not None:
-            x = torch.cat([x, skip], dim=1)
-            x = self.attention1(x)
-
-        x = self.block(x)
-        x = self.attention2(x)
-        return x
-
-
-class Conv2dReLU2(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, padding=0,
-                 stride=1, use_batchnorm=True, **batchnorm_params):
-
-        super().__init__()
-
-        layers = [
-            nn.Conv2d(
-                in_channels,
-                out_channels,
-                kernel_size,
-                stride=stride,
-                padding=padding,
-                bias=not (use_batchnorm)
-            )
-        ]
-
-        if use_batchnorm == 'inplace':
-            try:
-                from inplace_abn import InPlaceABN
-            except ImportError:
-                raise RuntimeError(
-                    "In order to use `use_batchnorm='inplace'` inplace_abn package must be installed. To install see: https://github.com/mapillary/inplace_abn")
-
-            layers.append(InPlaceABN(out_channels, activation='leaky_relu', activation_param=0.0, **batchnorm_params))
-        elif use_batchnorm:
-            layers.append(nn.BatchNorm2d(out_channels, **batchnorm_params))
-            layers.append(nn.ReLU(inplace=True))
-        else:
-            layers.append(nn.ReLU(inplace=True))
-
-        self.block = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.block(x)
-
-
-class SCSEModule(nn.Module):
-    def __init__(self, ch, re=16):
-        super().__init__()
-        self.cSE = nn.Sequential(nn.AdaptiveAvgPool2d(1),
-                                 nn.Conv2d(ch, ch // re, 1),
-                                 nn.ReLU(inplace=True),
-                                 nn.Conv2d(ch // re, ch, 1),
-                                 nn.Sigmoid()
-                                 )
-        self.sSE = nn.Sequential(nn.Conv2d(ch, ch, 1),
-                                 nn.Sigmoid())
-
-    def forward(self, x):
-        return x * self.cSE(x) + x * self.sSE(x)
-
-"""""""""""""""""""""""""""
-    
-"""""""""""""""""""""""""""
-
 class Conv2dReLU(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, padding=0, stride=1):
 
@@ -197,12 +119,17 @@ class Conv2dReLU(nn.Module):
         return self.block(x)
 
 
-def criterion(probability_label, probability_mask, truth_label, truth_mask):
-    #label
-    p = torch.clamp(probability_label, 1e-9, 1-1e-9)
-    t = truth_label
-    loss_label = - t*torch.log(p) - 2*(1-t)*torch.log(1-p)
-    loss_label = loss_label.mean()
+class Multi_Loss(nn.Module):
+    __name__ = 'Multi_Loss'
 
-    loss_mask = F.binary_cross_entropy(probability_mask,truth_mask, reduction='mean')
-    return loss_label, loss_mask
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, probability_label, probability_mask, truth_label, truth_mask):
+        p = torch.clamp(probability_label, 1e-9, 1 - 1e-9)
+        t = truth_label
+        loss_label = - t * torch.log(p) - 2 * (1 - t) * torch.log(1 - p)
+        loss_label = loss_label.mean()
+
+        loss_mask = F.binary_cross_entropy(probability_mask, truth_mask, reduction='mean')
+        return loss_label, loss_mask

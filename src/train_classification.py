@@ -15,9 +15,13 @@ from catalyst.dl.callbacks import EarlyStoppingCallback, AccuracyCallback
 from catalyst.dl.runner import SupervisedRunner
 from cloud_util import get_preprocessing, get_validation_augmentation, get_training_augmentation, to_tensor
 from optimizer.RAdam import RAdam
+from optimizer.NAdam import Nadam
+
+from sklearn.model_selection import KFold
+
 
 TRAIN_IMG_PATH = './data_process/data/train_images_resize/'
-
+TEST_IMG_PATH = './data_process/data/test_images_resize/'
 
 def main():
     train = pd.read_csv('./data_process/data/train_flip_aug_resize.csv')
@@ -29,60 +33,68 @@ def main():
 
     img_label = train.groupby('im_id')['img_label'].agg(list).reset_index()
 
-    image_train, image_val, label_train, label_val = train_test_split(
-        np.array(img_label.im_id),
-        np.array(img_label.img_label),
-        test_size=0.2, random_state=42)
+    kf = KFold(n_splits=5, shuffle=True, random_state=777)
+    fold = 0
+    for train, val in kf.split(img_label):
 
-    train_dataset = CloudClassDataset(
-        datatype='train',
-        img_ids=image_train,
-        img_labels=label_train,
-        transforms=get_training_augmentation(),
-        preprocessing=ort_get_preprocessing()
-    )
+        train_df = img_label.iloc[train]
+        image_train = np.array(train_df.im_id)
+        label_train = np.array(train_df.img_label)
 
-    valid_dataset = CloudClassDataset(
-        datatype='train',
-        img_ids=image_val,
-        img_labels=label_val,
-        transforms=get_validation_augmentation(),
-        preprocessing=ort_get_preprocessing()
-    )
+        val_df = img_label.iloc[val]
+        image_val = np.array(val_df.im_id)
+        label_val = np.array(val_df.img_label)
 
-    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=8)
-    valid_loader = DataLoader(valid_dataset, batch_size=16, shuffle=False, num_workers=8)
+        train_dataset = CloudClassDataset(
+            datatype='train',
+            img_ids=image_train,
+            img_labels=label_train,
+            transforms=get_training_augmentation(),
+            preprocessing=ort_get_preprocessing()
+        )
 
-    resnet_model = ResNet()
+        valid_dataset = CloudClassDataset(
+            datatype='train',
+            img_ids=image_val,
+            img_labels=label_val,
+            transforms=get_validation_augmentation(),
+            preprocessing=ort_get_preprocessing()
+        )
 
-    loaders = {
-        "train": train_loader,
-        "valid": valid_loader
-    }
+        train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=8)
+        valid_loader = DataLoader(valid_dataset, batch_size=16, shuffle=False, num_workers=8)
 
-    logdir = f"./class/segmentation"
+        resnet_model = ResNet()
 
-    print(logdir)
+        loaders = {
+            "train": train_loader,
+            "valid": valid_loader
+        }
 
-    optimizer = RAdam([
-        {'params': resnet_model.parameters(), 'lr': 1e-2},
-    ])
+        logdir = f"./class/segmentation/fold_{fold}/"
 
-    scheduler = ReduceLROnPlateau(optimizer, factor=0.5, patience=0)
-    criterion = nn.BCEWithLogitsLoss()
-    runner = SupervisedRunner()
+        print(logdir)
 
-    runner.train(
-        model=resnet_model,
-        criterion=criterion,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        loaders=loaders,
-        callbacks=[EarlyStoppingCallback(patience=5, min_delta=1e-7)],
-        logdir=logdir,
-        num_epochs=15,
-        verbose=1
-    )
+        optimizer = Nadam([
+            {'params': resnet_model.parameters(), 'lr':  1e-3},
+        ])
+
+        scheduler = ReduceLROnPlateau(optimizer, factor=0.5, patience=0)
+        criterion = nn.BCEWithLogitsLoss()
+        runner = SupervisedRunner()
+
+        runner.train(
+            model=resnet_model,
+            criterion=criterion,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            loaders=loaders,
+            callbacks=[EarlyStoppingCallback(patience=5, min_delta=1e-7)],
+            logdir=logdir,
+            num_epochs=15,
+            verbose=1
+        )
+        fold +=1
 
 
 class CloudClassDataset(Dataset):
@@ -101,11 +113,14 @@ class CloudClassDataset(Dataset):
         self.img_ids = img_ids
         self.img_labels = img_labels
         self.transforms = transforms
+        self.datatype = datatype
         self.preprocessing = preprocessing
 
     def __getitem__(self, idx):
         image_name = self.img_ids[idx]
-        img_label = self.img_labels[idx]
+
+        if self.datatype != 'test':
+            img_label = self.img_labels[idx]
 
         image_path = os.path.join(self.data_folder, image_name)
         img = cv2.imread(image_path)
@@ -117,9 +132,9 @@ class CloudClassDataset(Dataset):
             img = preprocessed['image']
 
         target = torch.zeros(4)
-
-        for cls in [i for i, x in enumerate(img_label) if x == 1]:
-            target[int(cls)] = 1
+        if self.datatype != 'test':
+            for cls in [i for i, x in enumerate(img_label) if x == 1]:
+                target[int(cls)] = 1
 
         return img, target
 
