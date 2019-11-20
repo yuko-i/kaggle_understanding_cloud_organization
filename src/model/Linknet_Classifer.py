@@ -23,7 +23,7 @@ class Linknet_resnet18_Classifer(nn.Module):
         self.initialize()
 
     def forward(self, x):
-        print(x.shape)
+
         batch_size, C, H, W = x.shape
         x0 = self.resnet_18.conv1(x)
         x0 = self.resnet_18.bn1(x0)
@@ -47,8 +47,7 @@ class Linknet_resnet18_Classifer(nn.Module):
         xd_4 = self.layer5([xd_3, None])
         probability_mask = self.final_conv(xd_4)
         probability_label = F.adaptive_max_pool2d(probability_mask, 1).view(batch_size, -1)
-        print(probability_label.shape)
-        print(probability_mask.shape)
+
         return probability_mask, probability_label
 
     def predict(self, x):
