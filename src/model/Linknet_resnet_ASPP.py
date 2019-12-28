@@ -6,9 +6,9 @@ from torchvision import models
 from torchvision.models.resnet import BasicBlock
 
 
-class Linknet_resnet18_ASPP(nn.Module):
+class Linknet_resnet_ASPP(nn.Module):
     def __init__(self, n_channels=3, n_classes=4):
-        super(Linknet_resnet18_ASPP, self).__init__()
+        super(Linknet_resnet_ASPP, self).__init__()
         # Encoder
         self.resnet_18 = models.resnet18(pretrained=True)
         # Decoder

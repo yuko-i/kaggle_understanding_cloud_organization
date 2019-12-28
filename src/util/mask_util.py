@@ -35,7 +35,7 @@ def make_mask(df: pd.DataFrame, image_name: str = 'img.jpg', shape: tuple = (350
 
     for idx, label in enumerate(encoded_masks.values):
         if label is not np.nan:
-            mask = rle_decode(label)
+            mask = rle_decode(mask_rle=label, shape=shape)
             masks[:, :, idx] = mask
 
     return masks

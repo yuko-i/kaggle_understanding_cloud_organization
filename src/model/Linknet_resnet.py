@@ -6,9 +6,12 @@ from torchvision import models
 class Linknet_resnet(nn.Module):
     def __init__(self, encoder: str='resnet18', class_num: int=4):
         super(Linknet_resnet, self).__init__()
+
         # Encoder
         if encoder == 'resnet18':
-            self.resnet_18 = models.resnet18(pretrained=True)
+            self.resnet = models.resnet18(pretrained=True)
+        elif  encoder == 'resnet34':
+            self.resnet = models.resnet34(pretrained=True)
 
         # Decoder
         in_channels = (512, 256, 128, 64, 64)
@@ -22,16 +25,16 @@ class Linknet_resnet(nn.Module):
 
     def forward(self, x):
 
-        x0 = self.resnet_18.conv1(x)
-        x0 = self.resnet_18.bn1(x0)
-        x0 = self.resnet_18.relu(x0)
+        x0 = self.resnet.conv1(x)
+        x0 = self.resnet.bn1(x0)
+        x0 = self.resnet.relu(x0)
 
-        x1 = self.resnet_18.maxpool(x0)
-        x1 = self.resnet_18.layer1(x1)
+        x1 = self.resnet.maxpool(x0)
+        x1 = self.resnet.layer1(x1)
 
-        x2 = self.resnet_18.layer2(x1)
-        x3 = self.resnet_18.layer3(x2)
-        x4 = self.resnet_18.layer4(x3)
+        x2 = self.resnet.layer2(x1)
+        x3 = self.resnet.layer3(x2)
+        x4 = self.resnet.layer4(x3)
 
         ec_x = [x4, x3, x2, x1, x0]
         encoder_head = ec_x[0]
@@ -42,8 +45,8 @@ class Linknet_resnet(nn.Module):
         x = self.layer3([x, skips[2]])
         x = self.layer4([x, skips[3]])
         x = self.layer5([x, None])
-        probability_mask = self.final_conv(x)
-        return probability_mask
+        x = self.final_conv(x)
+        return x
 
     def predict(self, x):
         if self.training:
@@ -64,20 +67,6 @@ class Linknet_resnet(nn.Module):
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
-
-class TransposeX2(nn.Module):
-
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-        self.block = nn.Sequential(
-            nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
-        )
-
-    def forward(self, x):
-        return self.block(x)
-
 
 class DecoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -103,6 +92,19 @@ class Conv2dReLU(nn.Module):
         super().__init__()
         self.block = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=padding, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        return self.block(x)
+
+class TransposeX2(nn.Module):
+
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         )

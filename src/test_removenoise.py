@@ -129,10 +129,37 @@ def main():
             probability = resize_img(probability)  # 各クラスごとにprobability(予測値)が取り出されている。jは0~3だと思う。
             probabilities[i * CLASS + j, :, :] = probability
 
+    attempts = []
+    for t in tqdm(range(45, 80, 5)):
+        t /= 100
+        for ms in [15000, 20000]:
+            masks = []
+            for probability in probabilities:
+                predict, num_predict = post_process(sigmoid(probability), t, ms)
+                masks.append(predict)
+            d = []
+            for i, j in zip(masks, valid_masks):
+                if (i.sum() == 0) & (j.sum() == 0):
+                    d.append(1)
+                else:
+                    d.append(dice(i, j))
+            attempts.append((t, ms, np.mean(d)))
+
+    attempts_df = pd.DataFrame(attempts, columns=['threshold', 'size', 'dice'])
+    attempts_df = attempts_df.sort_values('dice', ascending=False)
+    print(attempts_df.head(10))
+
+    class_params = {}
+    class_params[0] = (attempts_df['threshold'].values[0], attempts_df['size'].values[0])
+    class_params[1] = (attempts_df['threshold'].values[0], attempts_df['size'].values[0])
+    class_params[2] = (attempts_df['threshold'].values[0], attempts_df['size'].values[0])
+    class_params[3] = (attempts_df['threshold'].values[0], attempts_df['size'].values[0])
+
+
     # ========
     # search best size and threshold
     #
-
+    """
     class_params = {}
     for class_id in range(CLASS):
         attempts = []
@@ -152,7 +179,7 @@ def main():
         best_size = attempts_df['size'].values[0]
 
         class_params[class_id] = (best_threshold, best_size)
-
+    """
     # ========
     # gc
     #
@@ -257,7 +284,7 @@ if __name__ == '__main__':
                         default='./data_process/data/train_flip_aug_resize.csv')
     parser.add_argument('-sb', '--sub_csv', type=argparse.FileType('r'),
                         default='./data_process/data/sample_submission.csv')
-    parser.add_argument('-l', '--log_path', type=str, default='./log/logs_unet_fold_0_resnet34/segmentation')
+    parser.add_argument('-l', '--log_path', type=str, default='./log/logs_Unet_fold_0_resnet34/segmentation')
     parser.add_argument('-fn', '--fold_num', type=int, default=0)
     parser.add_argument('-mo', '--model_name', type=str, default='Unet')
     parser.add_argument('-ec', '--encoder', type=str, default='resnet34')
@@ -273,4 +300,4 @@ if __name__ == '__main__':
     print('success')
 
     from subprocess import check_call
-    check_call(['/home/yuko/kaggle_understanding_cloud_organization/src/SD.sh'], shell=True)
+    #check_call(['/home/yuko/kaggle_understanding_cloud_organization/src/SD.sh'], shell=True)

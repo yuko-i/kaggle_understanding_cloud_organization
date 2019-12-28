@@ -1,1 +1,27 @@
-num_workers: 16
+num_workers: 2
+
+transforms:
+  train:
+    Resize:
+      p: 1
+      height: 320
+      width: 480
+    ShiftScaleRotate:
+      p: 0.5
+      scale_limit: 0.5
+      rotate_limit: 0
+      shift_limit: 0.1
+    OpticalDistortion:
+      p: 0.5
+      distort_limit: 2
+      shift_limit: 0.5
+    Cutout:
+      p: 0.5
+      num_holes: 5
+      hole_size: 25
+
+  test:
+    Resize:
+      p: 1
+      height: 320
+      width: 480

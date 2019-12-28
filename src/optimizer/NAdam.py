@@ -6,7 +6,7 @@ import math
 https://github.com/qrfaction/Nadam/blob/master/Nadam.py
 """
 
-class Nadam(Optimizer):
+class NAdam(Optimizer):
 
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
                  schedule_decay=0.004,amsgrad=False):
@@ -16,7 +16,7 @@ class Nadam(Optimizer):
             raise ValueError("Invalid beta parameter at index 1: {}".format(betas[1]))
         defaults = dict(lr=lr, betas=betas, eps=eps,
                         amsgrad=amsgrad,schedule_decay=schedule_decay)
-        super(Nadam, self).__init__(params, defaults)
+        super(NAdam, self).__init__(params, defaults)
 
     def step(self, closure=None):
         loss = None

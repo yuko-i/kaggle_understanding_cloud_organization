@@ -11,7 +11,7 @@ from loss.MixLoss import MixLoss
 import torch
 from torch.utils.data import DataLoader
 from torch.optim import Adam
-from optimizer.NAdam import Nadam
+from optimizer.NAdam import NAdam
 from catalyst.dl.callbacks import DiceCallback, EarlyStoppingCallback
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from catalyst.dl.runner import SupervisedRunner
@@ -45,7 +45,7 @@ def main():
 
 
     train_fold = pd.read_csv(f'{fold_path}/train_file_fold_{fold_num}.csv')
-    val_fold = pd.read_csv(f'{fold_path}/val_file_fold_{fold_num}.csv')
+    val_fold = pd.read_csv(f'{fold_path}/valid_file_fold_{fold_num}.csv')
 
     train_ids = np.array(train_fold.file_name)
     valid_ids = np.array(val_fold.file_name)
@@ -100,14 +100,17 @@ def main():
 
     logdir = f"./log/logs_{model_name}_fold_{fold_num}_{encoder}/segmentation"
 
+    #for batch_idx, (data, target) in enumerate(loaders['train']):
+    #    print(batch_idx)
+
     print(logdir)
 
     if model_name ==  'ORG':
-        optimizer = Nadam([
+        optimizer = NAdam([
             {'params': model.parameters(), 'lr': learn_late},
         ])
     else:
-        optimizer = Nadam([
+        optimizer = NAdam([
             {'params': model.decoder.parameters(), 'lr': learn_late},
             {'params': model.encoder.parameters(), 'lr': learn_late},
         ])

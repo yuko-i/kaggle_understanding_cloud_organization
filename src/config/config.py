@@ -1,7 +1,12 @@
+BASE_CONFIG_YML = './config/base_config.yml'
 
-# path
-TRAIN_IMG_PATH = '/home/yuko/kaggle_understanding_cloud_organization/src/data_process/data/train_images_resize'
-TEST_IMG_PATH = '/home/yuko/kaggle_understanding_cloud_organization/src/data_process/data/test_images_resize'
-
-# const
-FOLD = 5
+CLASSES = {'Fish': 0,
+           'Flower': 1,
+           'Gravel': 2,
+           'Sugar': 3
+           }
+INV_CLASSES = {0: 'Fish',
+               1: 'Flower',
+               2: 'Gravel',
+               3: 'Sugar'
+               }

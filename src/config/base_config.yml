@@ -1,0 +1,76 @@
+work_dir: '/kaggle/working'
+
+data:
+  train_dir: './data/train_images'
+  test_dir:  './data/test_images'
+  fold_dir:  './data_process/data/fold_csv'
+  fold_train_file: 'train_file_fold'
+  fold_valid_file: 'valid_file_fold'
+  sample_submission_path: './data/sample_submission.csv'
+  train_df_path: './data/train.csv'
+  log_dir: './log'
+  height : 1400
+  width : 2100
+  params:
+    num_folds: 5
+    fold: 0
+  num_classes: 4
+
+model:
+  model_name: 'Linknet'
+  encoder: 'resnet34'
+  decoder: ''#ASPP
+
+train:
+  batch_size: 8
+  epoch: 25
+
+test:
+  batch_size: 8
+  best_threshold: 0.5
+  min_size: [500, 500, 1000, 2000]
+  tta: True
+
+transforms:
+  train:
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+    Resize:
+      p: 0
+    HorizontalFlip:
+      p: 0
+    VerticalFlip:
+      p: 0
+    ShiftScaleRotate:
+      p: 0
+    OpticalDistortion:
+      p: 0
+    Cutout:
+      p: 0
+
+  test:
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+    Resize:
+      p: 0
+    HorizontalFlip:
+      p: 0
+    VerticalFlip:
+      p: 0
+    ShiftScaleRotate:
+      p: 0
+    OpticalDistortion:
+      p: 0
+    Cutout:
+      p: 0
+
+optimizer:
+  name: 'NAdam'
+  params:
+    lr: 1.0e-3
+    encoder_lr: 1.0e-3
+    decoder_lr: 1.0e-3
+
+num_workers: 2
+device: 'cuda'#cuda
+devices: '0'#'0,1'

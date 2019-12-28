@@ -5,13 +5,13 @@ import pandas as pd
 from torch.utils.data import Dataset
 import albumentations as albu
 #from albumentations import torch as AT
+from cloud_util import to_tensor
 
 import sys
 sys.path.append('../')
 
-
-from config.config import TRAIN_IMG_PATH, TEST_IMG_PATH
-
+TRAIN_IMG_PATH='/home/yuko/kaggle_understanding_cloud_organization/src/data_process/data/train_images_removelight'
+TEST_IMG_PATH='/home/yuko/kaggle_understanding_cloud_organization/src/data_process/data/test_images_removelight'
 
 def make_mask(df: pd.DataFrame, image_name: str = 'img.jpg', shape: tuple = (350, 525)):
     encoded_masks = df.loc[df['im_id'] == image_name, 'EncodedPixels']
@@ -60,9 +60,12 @@ class CloudDataset(Dataset):
         img = cv2.imread(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
+
+
         augmented = self.transforms(image=img, mask=mask)
         img = augmented['image']
         mask = augmented['mask']
+
         if self.preprocessing:
             preprocessed = self.preprocessing(image=img, mask=mask)
             img = preprocessed['image']
